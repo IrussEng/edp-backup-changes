@@ -1,0 +1,21 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "localhost",
+  "AllowedOrigins": [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174"
+  ],
+  "ConnectionStrings": {
+    "MyConnection": "server=localhost;port=3306;database=learning_dev;user=tatum;password=mysql"
+  },
+  "Authentication": {
+    "Secret": "b8bc713a-d8d1-4d37-911e-1bb931d70ba5",
+    "TokenExpiresDays": 30
+  }
+}
