@@ -1,0 +1,170 @@
+// Controllers/EventController.cs
+using Microsoft.AspNetCore.Mvc;
+using BackendAPI.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace BackendAPI.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class EventController : ControllerBase
+    {
+        private readonly MyDbContext _context;
+
+        public EventController(MyDbContext context)
+        {
+            _context = context;
+        }
+
+        // GET: api/Event
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Event>>> GetEvents()
+        {
+            return await _context.Events.ToListAsync();
+        }
+
+        // GET: api/Event/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Event>> GetEvent(int id)
+        {
+            var eventItem = await _context.Events.FindAsync(id);
+
+            if (eventItem == null)
+            {
+                return NotFound();
+            }
+
+            return eventItem;
+        }
+
+        // GET: api/Event/ByEducator/5
+        [HttpGet("ByEducator/{educatorId}")]
+        public async Task<IActionResult> GetEventsByEducator(int educatorId)
+        {
+            var events = await _context.Events
+                .Where(e => e.EducatorID == educatorId)
+                .ToListAsync();
+            return Ok(events);
+        }
+
+        // POST: api/Event
+        [HttpPost]
+        public async Task<ActionResult<Event>> PostEvent(Event eventItem)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            _context.Events.Add(eventItem);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction("GetEvent", new { id = eventItem.EventID }, eventItem);
+        }
+
+        // PUT: api/Event/5
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutEvent(int id, Event eventItem)
+        {
+            if (id != eventItem.EventID)
+            {
+                return BadRequest();
+            }
+
+            _context.Entry(eventItem).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!EventExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // PATCH: api/Event/5/approval-status
+        [HttpPatch("{id}/approval-status")]
+        public async Task<IActionResult> UpdateApprovalStatus(int id, [FromBody] UpdateApprovalStatusRequest request)
+        {
+            var eventItem = await _context.Events.FindAsync(id);
+            if (eventItem == null)
+            {
+                return NotFound();
+            }
+
+            // Validate the new status
+            if (request.ApprovalStatus != "Approved" && request.ApprovalStatus != "Rejected" && request.ApprovalStatus != "Pending")
+            {
+                return BadRequest("Invalid approval status. Allowed values are 'Approved', 'Rejected', or 'Pending'.");
+            }
+
+            // Update the approval status
+            eventItem.ApprovalStatus = request.ApprovalStatus;
+
+            // Optionally, update remarks if provided
+            if (!string.IsNullOrEmpty(request.Remarks))
+            {
+                eventItem.Remarks = request.Remarks;
+            }
+
+            _context.Entry(eventItem).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!EventExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return NoContent();
+        }
+
+        // DELETE: api/Event/5
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteEvent(int id)
+        {
+            var eventItem = await _context.Events.FindAsync(id);
+            if (eventItem == null)
+            {
+                return NotFound();
+            }
+
+            _context.Events.Remove(eventItem);
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool EventExists(int id)
+        {
+            return _context.Events.Any(e => e.EventID == id);
+        }
+    
+
+    // Request model for updating approval status
+        public string ApprovalStatus { get; set; } = string.Empty;
+        public string? Remarks { get; set; }
+    }
+}
