@@ -1,0 +1,76 @@
+// App.tsx
+import { Route, Routes } from "react-router-dom";
+import { NextUIProvider } from "@nextui-org/react";
+
+import IndexPage from "@/pages/index";
+import Pricing from "@/pages/pricing";
+import CoursesPage from "./pages/courses";
+import StudentPlatformPage from "./pages/studentplatform";
+import StudentDashboard from "@/components/studentPlatform/studentDashboard";
+import StudentCourseList from "@/components/studentPlatform/studentCourses";
+import SustainabilityChallenges from "@/components/studentPlatform/sustainabilityChallenges";
+import StudentForums from "@/components/studentPlatform/studentForums";
+import CreatePost from "@/components/studentPlatform/createPost";
+import EditPost from "@/components/studentPlatform/editPost";
+import PostDetail from "@/components/studentPlatform/postDetail";
+import EditComment from "@/components/studentPlatform/editComment"; 
+import StudentCourseDashboardPage from "@/components/studentPlatform/StudentCourseDashboard";
+import StudentLesson from "@/components/studentPlatform/studentLesson";
+import LessonPage from "./pages/StudentLesson";
+import LoginPage from "./pages/login";
+import SignupPage from "./pages/signup";
+
+// Import Teacher Platform components
+import TeacherPlatformPage from "@/pages/teacherPlatformPage";
+import TeacherDashboard from "@/components/teacherPlatform/teacherDashboard";
+import TeacherCourses from "@/components/teacherPlatform/teacherCourses";
+import TeacherStudents from "@/components/teacherPlatform/teacherStudents";
+import TeacherResources from "@/components/teacherPlatform/teacherResources";
+import CreateCourse from "@/components/teacherPlatform/createCourse";
+import StudentCourseSignUp from "./components/studentPlatform/CourseSignUp";
+
+function App() {
+  return (
+    <NextUIProvider>
+      <Routes>
+        {/* Existing Routes */}
+        <Route element={<IndexPage />} path="/" />
+        <Route element={<Pricing />} path="/pricing" />
+        <Route element={<CoursesPage />} path="/courses" />
+        
+        <Route element={<StudentPlatformPage />} path="/studentplatform">
+          <Route index element={<StudentDashboard />} />
+          <Route element={<StudentCourseList />} path="studentCourses" />
+          <Route element={<StudentCourseSignUp />} path="coursesignup" />
+          <Route element={<StudentCourseDashboardPage />} path="coursedashboard" />
+          <Route element={<SustainabilityChallenges />} path="sustainabilityChallenges" />
+          <Route element={<StudentForums />} path="studentForums" />
+          <Route element={<CreatePost />} path="createPost" />
+          <Route element={<EditPost />} path="/studentplatform/editPost/:postId" />
+          <Route element={<PostDetail />} path="studentForums/:postId" /> 
+          <Route element={<EditComment />} path="/studentplatform/editComment/:commentId" />
+        <Route element={<StudentLesson />} path="lesson/:id" />
+      </Route>
+        <Route element={<LessonPage />} path="/lesson" />
+        <Route element={<LoginPage />} path="/login" />
+        <Route element={<SignupPage />} path="/signup" />
+
+        {/* Teacher Platform Routes */}
+        <Route element={<TeacherPlatformPage />} path="/teacher">
+          <Route index element={<TeacherDashboard />} />
+          <Route element={<TeacherCourses />} path="courses" />
+          <Route element={<TeacherStudents />} path="students" />
+          <Route element={<TeacherResources />} path="resources" />
+          <Route element={<CreateCourse />} path="courses/new" /> {/* Add this route */}
+          {/* <Route element={<CreateLesson />} path="lessons/new" />
+          
+          <Route path="courses/:courseId/add-lesson" element={<AddLesson />} />
+          <Route path="courses/:courseId/add-test" element={<AddTest />} /> */}
+          <Route element={<CreateCourse />} path="courses/new" />
+        </Route>
+      </Routes>
+    </NextUIProvider>
+  );
+}
+
+export default App;
