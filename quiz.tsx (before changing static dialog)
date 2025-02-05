@@ -1,0 +1,213 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Card } from "@nextui-org/react";
+import { PieChart, Pie, Cell, Tooltip } from "recharts";
+import { X } from "lucide-react";
+import { quizQuestions } from './quizQuestions';
+type CategoryKeys = keyof typeof quizQuestions;
+
+export default function Quiz() {
+    const { id = "", title = "", category = "", duration = "", questions = "" } = useParams();
+    const navigate = useNavigate();
+
+    const [isOpen, setIsOpen] = useState(true);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: string }>({});
+    const [quizData, setQuizData] = useState<{ question: string; options: string[]; correctAnswer: string }[]>([]);
+    const [isSubmitWarningOpen, setIsSubmitWarningOpen] = useState(false);
+    const [score, setScore] = useState(0);
+    const [isResultsOpen, setIsResultsOpen] = useState(false);
+    const [isReviewMode, setIsReviewMode] = useState(false);
+
+    const resultsData = [
+        { name: "Correct", value: score },
+        { name: "Incorrect", value: quizData.length - score },
+    ];
+
+    const COLORS = ["#00C49F", "#FF4444"];
+
+    // Fetch quiz data based on category and number of questions
+    useEffect(() => {
+        if (category && Object.keys(quizQuestions).includes(category)) {
+            const categoryKey = category as CategoryKeys;
+            setQuizData(quizQuestions[categoryKey].slice(0, Number(questions) || 15)); // Default to 15 questions
+        } else {
+            console.error("Category not found in quizQuestions!");
+        }
+    }, [category, questions]);
+
+    const handleClose = () => {
+        setIsOpen(false);
+        navigate('/studentplatform/challenges');
+    };
+
+    // Answer selection handler
+    const handleSelectAnswer = (questionIndex: number, answer: string) => {
+        setSelectedAnswers(prev => ({
+            ...prev,
+            [questionIndex]: answer, // Store answer per question index
+        }));
+    };
+
+    // Result calculation logic
+    const calculateResults = () => {
+        let correctAnswers = 0;
+
+        quizData.forEach((question, index) => {
+            if (selectedAnswers[index] === question.correctAnswer) {
+                correctAnswers++;
+            }
+        });
+
+        setScore(correctAnswers);
+        setIsResultsOpen(true); // Open results view after calculation
+    };
+
+    // Check if all questions have been answered before submission
+    const handleSubmit = () => {
+        const allAnswered = Object.keys(selectedAnswers).length === quizData.length;
+
+        if (!allAnswered) {
+            setIsSubmitWarningOpen(true); // Show warning modal
+            setTimeout(() => setIsSubmitWarningOpen(false), 5000); // Close the warning after 5 seconds
+            return;
+        }
+
+        calculateResults();
+    };
+
+    // Reset answers, back to start 
+    const handleTryAgain = () => {
+        setIsResultsOpen(false);
+        setScore(0);
+        setSelectedAnswers({});
+        setCurrentQuestionIndex(0);
+        setIsReviewMode(false);
+    };
+
+    if (!title) return <p>Loading...</p>;
+
+    return (
+        <>
+            {/* Quiz Modal */}
+            <Modal isOpen={isOpen} onClose={handleClose} backdrop={isSubmitWarningOpen ? "transparent" : "blur"}>
+                <ModalContent>
+                    <ModalHeader className="flex justify-between items-center">
+                        <h2 className="text-xl font-bold">{decodeURIComponent(title)}</h2>
+                    </ModalHeader>
+
+                    <ModalBody className="max-h-[80vh] overflow-y-auto">
+                        {/* Submit Warning */}
+                        {isSubmitWarningOpen && (
+                            <div className="bg-red-500 text-white text-center p-2 rounded mb-4">
+                                Please answer all questions before submitting.
+                            </div>
+                        )}
+
+                        <h3 className="text-md font-semibold text-gray-700">
+                            Category: {decodeURIComponent(category)}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                            Duration: {duration} | Questions: {questions}
+                        </p>
+
+                        {quizData.length > 0 && !isResultsOpen && !isReviewMode && (
+                            <Card className="p-4 mt-4">
+                                <h2 className="text-lg font-semibold">
+                                    Question {currentQuestionIndex + 1} of {quizData.length}
+                                </h2>
+                                <p className="mt-2">{quizData[currentQuestionIndex]?.question}</p>
+
+                                <div className="flex flex-col gap-2 mt-2">
+                                    {quizData[currentQuestionIndex].options.map((option, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleSelectAnswer(currentQuestionIndex, option)}
+                                            className={`p-2 border rounded w-full text-left transition-all ${selectedAnswers[currentQuestionIndex] === option ? "bg-blue-500 text-white font-bold" : "bg-gray-200"
+                                                }`}
+                                        >
+                                            {option}
+                                        </button>
+                                    ))}
+                                </div>
+                            </Card>
+                        )}
+
+                        {/* Results (Pie chart) */}
+                        {isResultsOpen && (
+                            <Card className="p-4 mt-4 flex justify-center items-center">
+                                <PieChart width={300} height={300}>
+                                    <Pie data={resultsData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
+                                        {resultsData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={{ backgroundColor: "#333", borderColor: "#333", color: "white" }} />
+                                </PieChart>
+                                <p className="text-center font-semibold">Score: {score}/{quizData.length}</p>
+                            </Card>
+                        )}
+
+                        {/* Review Answers Button */}
+                        {/* {isResultsOpen && !isReviewMode && (
+                            <Button onClick={() => setIsReviewMode(true)} color="primary" className="mt-4">
+                                Review Answers
+                            </Button>
+                        )} */}
+                        {isResultsOpen && (
+                            <>
+                                <Button onClick={handleTryAgain} color="success" className="mt-4">
+                                    Try Again
+                                </Button>
+                                <Button onClick={() => setIsReviewMode(true)} color="primary" className="mt-4">
+                                    Review Answers
+                                </Button>
+                            </>
+                        )}
+
+                        {/* Review Mode */}
+                        {isReviewMode && (
+                            <div className="mt-4">
+                                {quizData.map((question, index) => (
+                                    <Card key={index} className="p-4 mb-2">
+                                        <h3 className="font-semibold">{question.question}</h3>
+                                        {question.options.map((option, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`p-2 border rounded mt-2 ${selectedAnswers[index] === option ? (option === question.correctAnswer ? "bg-green-500" : "bg-red-500") : ""}`}
+                                            >
+                                                {option}
+                                                {selectedAnswers[index] === option && option === question.correctAnswer && <span className="ml-2">✔️</span>}
+                                                {selectedAnswers[index] === option && option !== question.correctAnswer && <span className="ml-2">❌</span>}
+                                            </div>
+                                        ))}
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
+                    </ModalBody>
+
+                    <ModalFooter className="flex justify-between">
+                        <Button
+                            onClick={() => setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0))}
+                            disabled={currentQuestionIndex === 0}
+                        >
+                            Previous
+                        </Button>
+                        {currentQuestionIndex < quizData.length - 1 ? (
+                            <Button
+                                onClick={() => setCurrentQuestionIndex((prev) => Math.min(prev + 1, quizData.length - 1))}
+                            >
+                                Next
+                            </Button>
+                        ) : (
+                            <Button color="success" onClick={handleSubmit}>
+                                Submit
+                            </Button>
+                        )}
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+        </>
+    );
+}
