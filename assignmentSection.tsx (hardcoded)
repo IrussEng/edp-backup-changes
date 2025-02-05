@@ -1,0 +1,81 @@
+// NextUI (new code)
+
+import React from 'react';
+import { mockAssignments } from './mockData';
+import { Card, CardBody, CardHeader, Chip } from '@nextui-org/react';
+
+const AssignmentsSection = () => {
+  return (
+    <Card className="mb-8">
+      <CardHeader className="font-semibold text-lg px-6 py-4">
+        Upcoming Assignments
+      </CardHeader>
+      <CardBody className="px-6">
+        {mockAssignments.map((assignment) => (
+          <div key={assignment.id} className="py-3 border-b last:border-b-0">
+            <h3 className="font-medium mb-1">{assignment.title}</h3>
+            <div className="flex justify-between items-center">
+              <Chip
+                size="sm"
+                color={assignment.status === "In Progress" ? "warning" : "default"}
+              >
+                {assignment.status}
+              </Chip>
+              <span className="text-sm text-default-500">{assignment.dueDate}</span>
+            </div>
+          </div>
+        ))}
+      </CardBody>
+    </Card>
+  );
+};
+
+export default AssignmentsSection;
+
+
+
+
+
+
+
+// Material UI (Old working code)
+// For it to work again "npm install @mui/material @emotion/react @emotion/styled"
+
+// import React from 'react';
+// import { mockAssignments, mockCourses } from './mockData';
+// import { Card, CardContent } from '@mui/material';
+
+// const AssignmentsSection = () => {
+//     return (
+//       <Card className="mb-8">
+//         <CardContent className="p-6">
+//           <h2 className="text-lg font-semibold mb-4">Upcoming</h2>
+//           <h3 className="font-medium mb-2">Assignments</h3>
+//           <div className="space-y-2">
+//             {mockAssignments.map((assignment) => (
+//               <div key={assignment.id} className="flex justify-between items-center">
+//                 <div>
+//                   <h4 className="text-sm font-medium">{assignment.title}</h4>
+//                   <span className={`text-xs ${
+//                     assignment.status === 'Submitted' 
+//                       ? 'text-green-600' 
+//                       : assignment.status === 'In Progress' 
+//                       ? 'text-yellow-600' 
+//                       : 'text-gray-600'
+//                   }`}>
+//                     {assignment.status}
+//                   </span>
+//                 </div>
+//                 <span className="text-sm text-gray-500">{assignment.dueDate}</span>
+//               </div>
+//             ))}
+//           </div>
+//           <button className="w-full text-center text-sm text-gray-600 mt-4">
+//             See All Upcoming Assignments
+//           </button>
+//         </CardContent>
+//       </Card>
+//     );
+//   };
+  
+//   export default AssignmentsSection;
