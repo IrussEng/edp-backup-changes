@@ -1,0 +1,603 @@
+// Created these files
+    - BackendAPI/Controllers/QuizController.cs
+    - BackendAPI/Models/Quiz.cs
+    - BackendAPI/Models/Question.cs
+    - Frontend/src/components/teacherPlatform/createQuizzes.tsx
+    - Frontend/src/components/teacherPlatform/editQuiz.tsx
+    - Frontend/src/components/teacherPlatform/quizList.tsx
+
+
+// ChatController.cs
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using DateTime = System.DateTime;
+using Newtonsoft.Json;
+
+namespace BackendAPI.Controllers
+{
+@@ -25,37 +26,110 @@
+        public async Task<IActionResult> GetAllStudents()
+        {
+            var students = await _context.Students
+                .Include(s => s.User)  // Ensure User data is loaded
+                .Include(s => s.User)
+                .Select(s => new
+                {
+                    Id = s.User.Id,   // Get the User ID
+                    Name = s.User.Name // Get the User's Name
+                    Id = s.User.Id,
+                    Name = s.User.Name,
+                    LastMessage = _context.ChatMessages
+                        .Where(m => (m.SenderId == s.User.Id || m.ReceiverId == s.User.Id))
+                        .OrderByDescending(m => m.Timestamp)
+                        .Select(m => m.Message)
+                        .FirstOrDefault(),
+                    LastMessageTimestamp = _context.ChatMessages
+                        .Where(m => (m.SenderId == s.User.Id || m.ReceiverId == s.User.Id))
+                        .OrderByDescending(m => m.Timestamp)
+                        .Select(m => m.Timestamp)
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            if (!students.Any())
+            {
+                Console.WriteLine("No students found or no messages available.");
+                return NotFound(new { error = "No students found" });
+            }
+            // Format the student data
+            var formattedStudents = students.Select(student =>
+            {
+                string formattedTimestamp = "No messages yet"; // Default value
+
+            return Ok(students);
+                if (student.LastMessageTimestamp != default(DateTimeOffset))
+                {
+                    try
+                    {
+                        var singaporeTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+                        var localTime = TimeZoneInfo.ConvertTimeFromUtc(student.LastMessageTimestamp.UtcDateTime, singaporeTimeZone);
+                        formattedTimestamp = localTime.ToString("yyyy-MM-dd'T'HH:mm:sszzz"); // ISO 8601 format
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error while formatting timestamp for student {student.Name}: {ex.Message}");
+                        formattedTimestamp = "Error formatting timestamp";
+                    }
+                }
+                return new
+                {
+                    student.Id,
+                    student.Name,
+                    student.LastMessage,
+                    LastMessageTimestamp = formattedTimestamp // Now it's in ISO format
+                };
+            }).ToList();
+            Console.WriteLine("Returning formatted student data.");
+            return Ok(formattedStudents);
+        }
+
+        // Get all educators for chat sidebar
+        [HttpGet("educators")]
+        public async Task<IActionResult> GetAllEducators()
+        {
+            var educators = await _context.Educators
+                .Include(e => e.User)  // Ensure User data is loaded
+                .Include(e => e.User)
+                .Select(e => new
+                {
+                    Id = e.User.Id,   // Get the User ID
+                    Name = e.User.Name // Get the User's Name
+                    Id = e.User.Id,
+                    Name = e.User.Name,
+                    LastMessage = _context.ChatMessages
+                        .Where(m => (m.SenderId == e.User.Id || m.ReceiverId == e.User.Id))
+                        .OrderByDescending(m => m.Timestamp)
+                        .Select(m => m.Message)
+                        .FirstOrDefault(),
+                    LastMessageTimestamp = _context.ChatMessages
+                        .Where(m => (m.SenderId == e.User.Id || m.ReceiverId == e.User.Id))
+                        .OrderByDescending(m => m.Timestamp)
+                        .Select(m => m.Timestamp)
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            if (!educators.Any())
+                return NotFound(new { error = "No educators found" });
+
+            return Ok(educators);
+            var formattedEducators = educators.Select(educator =>
+            {
+                string formattedTimestamp = "No messages yet"; // Default value
+                if (educator.LastMessageTimestamp != default(DateTimeOffset))
+                {
+                    var singaporeTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+                    var localTime = TimeZoneInfo.ConvertTimeFromUtc(educator.LastMessageTimestamp.UtcDateTime, singaporeTimeZone);
+                    formattedTimestamp = localTime.ToString("yyyy-MM-dd'T'HH:mm:sszzz"); // ISO 8601 format
+                }
+                return new
+                {
+                    educator.Id,
+                    educator.Name,
+                    educator.LastMessage,
+                    LastMessageTimestamp = formattedTimestamp
+                };
+            }).ToList();
+            return Ok(formattedEducators);
+        }
+
+        // Send a message
+@@ -79,56 +153,58 @@
+                var chatMessage = new ChatMessage
+                {
+                    SenderId = messageDto.senderId,
+                    ReceiverId = messageDto.receiverId,
+                    Message = messageDto.message,
+                    Timestamp = DateTimeOffset.UtcNow
+                };
+
+                _context.ChatMessages.Add(chatMessage);
+                await _context.SaveChangesAsync();
+
+                var formattedTimestamp = chatMessage.Timestamp.ToString("yyyy-MM-dd'T'HH:mm:sszzz");
+                return Ok(new
+                {
+                    message = "Message sent successfully",
+                    data = new
+                    {
+                        chatMessage.Id,
+                        chatMessage.SenderId,
+                        SenderName = sender.Name,
+                        chatMessage.ReceiverId,
+                        ReceiverName = receiver.Name,
+                        chatMessage.Message,
+                        chatMessage.Timestamp
+                        Timestamp = formattedTimestamp
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { error = $"Error processing message: {ex.Message}" });
+            }
+        }
+
+        // Retrieve chat messages between two users
+        [HttpGet("messages/{userId1}/{userId2}")]
+        public async Task<IActionResult> GetMessages(int userId1, int userId2)
+        {
+            var messages = await _context.ChatMessages
+                .Where(m => (m.SenderId == userId1 && m.ReceiverId == userId2) ||
+                            (m.SenderId == userId2 && m.ReceiverId == userId1))
+                .OrderBy(m => m.Timestamp)
+                .Select(m => new
+                {
+                    m.Id,
+                    m.SenderId,
+                    SenderName = _context.Users.Where(u => u.Id == m.SenderId).Select(u => u.Name).FirstOrDefault(),
+                    m.ReceiverId,
+                    ReceiverName = _context.Users.Where(u => u.Id == m.ReceiverId).Select(u => u.Name).FirstOrDefault(),
+                    m.Message,
+                    m.Timestamp
+                })
+                .ToListAsync();
+
+            return Ok(new { messages });
+        }
+    }
+}
+
+
+
+// ChatMessageDTO.cs 
+
+namespace BackendAPI.Models
+{
+    public class ChatMessageDTO
+    {
+        public int senderId { get; set; }
+        public int receiverId { get; set; }
+        public string message { get; set; }
+        public string timestamp { get; set; }
+        public DateTimeOffset timestamp { get; set; }
+    }
+}
+
+
+// chatInput.tsx
+
+import { useState } from "react";
+import { getUserInfo } from "@/utils/authUtils";
+import { BackendUrl } from "@/context/BackendUrl";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+interface ChatInputProps {
+  receiverId: string;
+  onMessageSent: (message: any) => void;
+}
+
+const ChatInput: React.FC<ChatInputProps> = ({ receiverId, onMessageSent }) => {
+  const user = getUserInfo();
+  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(""); // For the current message input
+  const [messages, setMessages] = useState<any[]>([]); // Store all messages in the chat
+
+  const sendMessage = async () => {
+    if (!message.trim() || !user) return;
+
+    try {
+      const payload = {
+        senderId: parseInt(user.id),
+        receiverId: parseInt(receiverId),
+        message: message.trim(),
+        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+      };
+
+      // Add detailed logging
+      console.log("Full payload being sent:", JSON.stringify(payload, null, 2));
+      console.log("User info:", JSON.stringify(user, null, 2));
+      console.log("Receiver ID:", receiverId);
+
+      const response = await fetch(`${BackendUrl}/api/chat/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json();
+      console.log("Server response:", responseData);
+
+      if (!response.ok) {
+        throw new Error(JSON.stringify(responseData));
+      }
+
+      // Format the timestamp into Singapore timezone
+      const formattedTimestamp = format(
+        toZonedTime(new Date().toISOString(), "Asia/Singapore"),
+        "hh:mm a"
+      );
+      // Update the message timestamp with the formatted one
+      responseData.timestamp = formattedTimestamp;
+      // Send the new message data to the parent component (onMessageSent)
+      onMessageSent(responseData);
+      // Update the messages state with the new message
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          id: responseData.data.id,
+          senderId: user.id,
+          receiverId: receiverId,
+          message: message.trim(),
+          timestamp: formattedTimestamp, // Store the formatted timestamp
+        },
+      ]);
+      // Clear the message input field after sending
+      setMessage("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="border-t p-4 bg-white">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          placeholder="Type a message..."
+          className="flex-1 p-2 border rounded-lg focus:outline-none focus:border-blue-500"
+        />
+        <button
+          onClick={sendMessage}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+          disabled={!message.trim()}
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default ChatInput;
+
+
+
+// chatSidebar.tsx
+
+import { useEffect, useState } from "react";
+import { getUserInfo } from "@/utils/authUtils";
+import { BackendUrl } from "@/context/BackendUrl";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+interface User {
+  id: string;
+  name: string;
+  lastMessage?: string;
+  lastMessageTimestamp?: string;
+}
+
+interface ChatSidebarProps {
+  onSelectUser: (user: User) => void;
+}
+
+const ChatSidebar: React.FC<ChatSidebarProps> = ({ onSelectUser }) => {
+  const user = getUserInfo();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const formatTimestamp = (timestamp: string) => {
+    const parsedDate = new Date(timestamp);
+    // Check if the parsed date is valid
+    if (isNaN(parsedDate.getTime())) {
+      console.error(`Invalid timestamp: "${timestamp}". Failed to parse into a valid Date object.`);
+      return ""; // Return a fallback value in case of error
+    }
+    // Format the date to the Singapore Timezone
+    return format(toZonedTime(parsedDate, "Asia/Singapore"), "hh:mm a");
+  };
+  // Extract initials from the user's name
+  const getInitials = (name: string) => {
+    const nameParts = name.split(" ");
+    const firstInitial = nameParts[0]?.charAt(0)?.toUpperCase() || "";
+    const secondInitial = nameParts[1]?.charAt(0)?.toUpperCase() || "";
+    return firstInitial + secondInitial;
+  };
+  useEffect(() => {
+    if (!user?.role) return;
+
+    const fetchUsers = async () => {
+      try {
+        const endpoint = user.role === "student" ? "/api/chat/educators" : "/api/chat/students";
+        const endpoint =
+          user.role === "student" ? "/api/chat/educators" : "/api/chat/students";
+        const response = await fetch(`${BackendUrl}${endpoint}`);
+        if (!response.ok) throw new Error(`Fetch failed: ${response.statusText}`);
+
+        const data = await response.json();
+        setUsers(data.map((u: any) => ({ ...u, id: String(u.id) })));
+        console.log("Fetched Users and Messages:", data);
+        setUsers(
+          data.map((u: any) => {
+            console.log(`Processing user ${u.name}`);
+            let formattedTimestamp = "No messages yet";
+            if (u.lastMessageTimestamp) {
+              console.log(`Raw timestamp for ${u.name}: ${u.lastMessageTimestamp}`);
+              // Use the formatTimestamp function to format the timestamp
+              formattedTimestamp = formatTimestamp(u.lastMessageTimestamp);
+              console.log(`Formatted timestamp for ${u.name}: ${formattedTimestamp}`);
+            }
+            // Get the last message text or set a default message
+            const lastMessageDisplay =
+              u.lastMessage && u.lastMessage.includes(user?.name || "")
+                ? `You: ${u.lastMessage}`
+                : u.lastMessage || "";
+            return {
+              ...u,
+              id: String(u.id),
+              name: u.name,
+              lastMessage: lastMessageDisplay,
+              lastMessageTimestamp: formattedTimestamp,
+            };
+          })
+        );
+      } catch (error) {
+        console.error("Fetch error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [user?.role]);
+
+  return (
+    <div className="w-1/3 bg-gray-100 p-4 border-r">
+      <h2 className="text-lg font-semibold mb-4">Chats</h2>
+      {loading ? (
+        <p>Loading users...</p>
+      ) : users.length === 0 ? (
+        <p>No users available.</p>
+      ) : (
+        <div className="space-y-3">
+          {users.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => onSelectUser(u)}
+              className="flex items-center gap-3 p-3 rounded-lg bg-white shadow hover:bg-gray-200 w-full text-left"
+              className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white shadow hover:bg-gray-200 w-full text-left"
+            >
+              <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
+              {/* Display the user initial in the circle */}
+              <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-white">
+                {getInitials(u.name)}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{u.name}</p>
+                {/* Display the last message text below the name */}
+                <p className="text-xs text-gray-600">{u.lastMessage}</p>
+              </div>
+              <div className="text-xs text-gray-500">
+                {/* Display the last message timestamp */}
+                {u.lastMessageTimestamp}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatSidebar;
+
+
+// chatWindow.tsx
+
+import { useState, useEffect } from "react";
+import { getUserInfo } from "@/utils/authUtils";
+import { BackendUrl } from "@/context/BackendUrl";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+interface ChatWindowProps {
+  receiverId: string;
+}
+
+interface Message {
+  id: number;
+  senderId: string;
+  receiverId: string;
+  message: string;
+  timestamp: string;
+}
+
+interface ReceiverDetails {
+  id: string;
+  name: string;
+  profilePicture?: string;
+}
+
+const ChatWindow: React.FC<ChatWindowProps> = ({ receiverId }) => {
+  const user = getUserInfo();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [receiverDetails, setReceiverDetails] = useState<ReceiverDetails | null>(null);
+
+  useEffect(() => {
+    if (!user || !receiverId) return;
+
+    const fetchReceiverDetails = async () => {
+      try {
+        // Determine the correct endpoint based on user role
+        const endpoint = `/api/chat/${user.role === "student" ? "educators" : "students"}`;
+        const response = await fetch(`${BackendUrl}${endpoint}`);
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch users");
+        }
+
+        const users = await response.json();
+        // Find the specific user that matches our receiverId
+        const receiver = users.find((u: any) => String(u.id) === receiverId);
+        
+        if (receiver) {
+          setReceiverDetails({
+            id: String(receiver.id),
+            name: receiver.name,
+            profilePicture: receiver.profilePicture
+            profilePicture: receiver.profilePicture,
+          });
+        } else {
+          console.error("Receiver not found in users list");
+        }
+      } catch (error) {
+        console.error("Error fetching receiver details:", error);
+      }
+    };
+
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch(`${BackendUrl}/api/chat/messages/${user.id}/${receiverId}`);
+        if (!response.ok) throw new Error("Failed to fetch messages");
+
+        const data = await response.json();
+        setMessages(data.messages || []);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
+
+    // Fetch both receiver details and messages
+    fetchReceiverDetails();
+    fetchMessages();
+
+    const interval = setInterval(fetchMessages, 5000);
+    return () => clearInterval(interval);
+  }, [user?.id, user?.role, receiverId]); // Added user.role to dependencies
+
+  if (!user) return <p>Loading...</p>;
+
+  const formatTimestamp = (timestamp: string) => {
+    return format(toZonedTime(new Date(timestamp), "Asia/Singapore"), "hh:mm a");
+  };
+  return (
+    <div className="flex flex-col flex-1 bg-white p-4 overflow-y-auto h-[500px]">
+      {/* Chat header */}
+      <div className="flex items-center p-3 border-b">
+        {receiverDetails?.profilePicture ? (
+          <img src={receiverDetails.profilePicture} alt="Profile" className="w-10 h-10 rounded-full" />
+          <img
+            src={receiverDetails.profilePicture}
+            alt="Profile"
+            className="w-10 h-10 rounded-full"
+          />
+        ) : (
+          <div className="w-10 h-10 bg-gray-400 rounded-full flex items-center justify-center text-white">
+            {receiverDetails?.name?.charAt(0) || '?'}
+            {receiverDetails?.name?.charAt(0) || "?"}
+          </div>
+        )}
+        <p className="ml-3 font-semibold">
+          {receiverDetails?.name || "Loading..."}
+        </p>
+        <p className="ml-3 font-semibold">{receiverDetails?.name || "Loading..."}</p>
+      </div>
+
+      {/* Chat messages */}
+      <div className="flex-1 overflow-y-auto space-y-4 py-4">
+        {messages.length === 0 ? (
+          <p className="text-center text-gray-500">No messages yet. Start the conversation!</p>
+        ) : (
+          messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`mb-2 p-2 rounded-lg max-w-xs ${
+              className={`relative mb-2 p-3 break-words rounded-lg ${
+                String(msg.senderId) === user.id
+                  ? "bg-blue-500 text-white self-end ml-auto"
+                  : "bg-gray-200 text-black self-start"
+                  ? "bg-[#d9fdd3] text-black self-end ml-auto max-w-[70%]" // Sender message box: green
+                  : "bg-[#f1f1f1] text-black self-start max-w-[70%]" // Receiver message box: light gray
+              }`}
+              style={{
+                wordWrap: "break-word",
+                maxWidth: "fit-content", // Dynamic width for message box
+              }}
+            >
+              <p>{msg.message}</p>
+              <div className="flex flex-col">
+                <p>{msg.message}</p>
+                <span className="text-xs text-gray-600 mt-1 self-end">{formatTimestamp(msg.timestamp)}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ChatWindow;
